@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
   FlatList,
@@ -9,12 +10,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useCartStore } from "../../store/useCartStore";
 
 const colors = {
-  bg: "#F5E6CC",        
+  bg: "#F5E6CC",
   card: "#FFFFFF",
   shadow: "#000000",
-  primary: "#C49A6C",   
+  primary: "#C49A6C",
   text: "#333333",
   muted: "#7A7A7A",
   border: "#E0C9A6",
@@ -24,7 +26,7 @@ type Product = {
   id: string;
   name: string;
   price: number;
-  image: any; 
+  image: any;
 };
 
 // Dados mockados
@@ -52,6 +54,9 @@ const PRODUCTS: Product[] = [
 export default function CatalogScreen() {
   const [query, setQuery] = useState("");
   const [qty, setQty] = useState<Record<string, number>>({}); // {productId: quantidade}
+
+  // pega a ação do store para preencher o carrinho e navegar
+  const setFromMap = useCartStore((s) => s.setFromMap);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -100,9 +105,18 @@ export default function CatalogScreen() {
   };
 
   const onBuy = () => {
-    // futura navegação para "Cart" ou finalização direta
-    // por agora, só um log:
-    console.log("Comprar:", qty, "Total:", total);
+    // monta o "mapa" {id: {name, price, qty}} apenas com itens > 0
+    const map: Record<string, { name: string; price: number; qty: number }> = {};
+    for (const p of PRODUCTS) {
+      const q = qty[p.id] || 0;
+      if (q > 0) {
+        map[p.id] = { name: p.name, price: p.price, qty: q };
+      }
+    }
+
+    // preenche o carrinho global e navega para o checkout
+    setFromMap(map);
+    router.push("/(main)/checkout");
   };
 
   return (
