@@ -1,4 +1,3 @@
-// app/(main)/checkout.tsx
 import * as Clipboard from "expo-clipboard";
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
@@ -13,11 +12,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { finalizeSale } from "../../db";
 import { useCartStore } from "../../store/useCartStore";
 import colors from "../../theme/colors";
 import { money } from "../../utils/currency";
 
-const PIX_KEY = process.env.EXPO_PUBLIC_PIX_KEY || ""; // opcional, para "Copiar chave"
+const PIX_KEY = process.env.EXPO_PUBLIC_PIX_KEY || "";
 
 export default function Checkout() {
   const { items, setQty, remove, clear, total } = useCartStore();
@@ -39,10 +39,21 @@ export default function Checkout() {
       Alert.alert("Carrinho vazio", "Adicione itens antes de confirmar.");
       return;
     }
-    // TODO (próximo passo): salvar venda no SQLite e dar baixa no estoque
-    clear();
-    Alert.alert("Venda concluída", "A venda foi registrada (MVP).");
-    router.replace("/(main)");
+    try {
+      const payload = items.map((i) => ({
+        productId: i.id,
+        qty: i.qty,
+        unitPrice: i.price,
+      }));
+
+      await finalizeSale(payload); 
+      clear();
+
+      Alert.alert("Venda concluída", "Estoque atualizado e venda registrada.");
+      router.replace("/(main)"); 
+    } catch (e: any) {
+      Alert.alert("Erro ao salvar", e?.message ?? "Tente novamente.");
+    }
   };
 
   return (
@@ -76,7 +87,6 @@ export default function Checkout() {
         contentContainerStyle={{ paddingBottom: 16 }}
       />
 
-      {/* Seção PIX com imagem estática */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Pagamento via PIX</Text>
         <Text style={styles.help}>
@@ -99,7 +109,6 @@ export default function Checkout() {
         )}
       </View>
 
-      {/* Total + Confirmar (rolável, sem footer fixo) */}
       <View style={styles.totalRow}>
         <View style={styles.totalBox}>
           <Text style={styles.totalLabel}>Total</Text>
@@ -114,7 +123,6 @@ export default function Checkout() {
         </TouchableOpacity>
       </View>
 
-      {/* Modal de zoom do QR */}
       <Modal visible={zoom} transparent animationType="fade" onRequestClose={() => setZoom(false)}>
         <View style={styles.modalBg}>
           <Pressable style={styles.modalBg} onPress={() => setZoom(false)}>

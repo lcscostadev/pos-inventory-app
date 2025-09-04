@@ -1,6 +1,7 @@
-import { router } from "expo-router";
-import React, { useMemo, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   FlatList,
   Image,
   SafeAreaView,
@@ -10,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { getAllProducts, Product } from "../../db";
 import { useCartStore } from "../../store/useCartStore";
 
 const colors = {
@@ -22,58 +24,60 @@ const colors = {
   border: "#E0C9A6",
 };
 
-type Product = {
-  id: string;
-  name: string;
-  price: number;
-  image: any;
-};
-
-// Dados mockados
-const PRODUCTS: Product[] = [
-  {
-    id: "1",
-    name: "Amanteigado Tradicional",
-    price: 10,
-    image: require("../../assets/images/biscoito.png"),
-  },
-  {
-    id: "2",
-    name: "Amanteigado com Goiabada",
-    price: 10,
-    image: require("../../assets/images/biscoito.png"),
-  },
-  {
-    id: "3",
-    name: "Amanteigado com Chocolate",
-    price: 10,
-    image: require("../../assets/images/biscoito.png"),
-  },
-];
-
 export default function CatalogScreen() {
   const [query, setQuery] = useState("");
-  const [qty, setQty] = useState<Record<string, number>>({}); // {productId: quantidade}
+  const [products, setProducts] = useState<Product[]>([]);
+  const [qty, setQty] = useState<Record<string, number>>({}); 
 
-  // pega a ação do store para preencher o carrinho e navegar
   const setFromMap = useCartStore((s) => s.setFromMap);
+
+  const load = useCallback(async () => {
+    try {
+      const list = await getAllProducts();
+      setProducts(list);
+      setQty((prev) => {
+        const next = { ...prev };
+        for (const p of list) {
+          const selected = next[p.id] || 0;
+          if (selected > p.stock) next[p.id] = p.stock;
+        }
+        return next;
+      });
+    } catch (e) {
+      console.warn("Erro ao carregar produtos:", e);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return PRODUCTS;
-    return PRODUCTS.filter((p) => p.name.toLowerCase().includes(q));
-  }, [query]);
+    if (!q) return products;
+    return products.filter((p) => p.name.toLowerCase().includes(q));
+  }, [query, products]);
 
   const total = useMemo(() => {
     return Object.entries(qty).reduce((acc, [id, q]) => {
-      const p = PRODUCTS.find((x) => x.id === id);
+      const p = products.find((x) => x.id === id);
       if (!p) return acc;
       return acc + p.price * q;
     }, 0);
-  }, [qty]);
+  }, [qty, products]);
 
-  const inc = (id: string) =>
-    setQty((s) => ({ ...s, [id]: (s[id] ?? 0) + 1 }));
+  const inc = (p: Product) =>
+    setQty((s) => {
+      const cur = s[p.id] ?? 0;
+      if (cur >= p.stock) {
+        Alert.alert("Estoque insuficiente", `Restam apenas ${p.stock} unidades.`);
+        return s;
+      }
+      return { ...s, [p.id]: cur + 1 };
+    });
+
   const dec = (id: string) =>
     setQty((s) => {
       const next = Math.max(0, (s[id] ?? 0) - 1);
@@ -82,19 +86,26 @@ export default function CatalogScreen() {
 
   const renderItem = ({ item }: { item: Product }) => {
     const count = qty[item.id] ?? 0;
+    const remaining = item.stock - count;
     return (
       <View style={styles.card}>
-        <Image source={item.image} style={styles.image} resizeMode="cover" />
+        <Image source={require("../../assets/images/biscoito.png")} style={styles.image} resizeMode="cover" />
         <View style={styles.cardContent}>
           <Text style={styles.name}>{item.name}</Text>
-          <View style={styles.rowBetween}>
+
+          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
             <Text style={styles.price}>R$ {item.price}</Text>
+            <Text style={styles.stockInfo}> • Em estoque: {item.stock}</Text>
+            {count > 0 && <Text style={styles.stockInfo}> • Restante: {remaining}</Text>}
+          </View>
+
+          <View style={styles.rowBetween}>
             <View style={styles.stepper}>
               <TouchableOpacity onPress={() => dec(item.id)} style={styles.stepBtn}>
                 <Text style={styles.stepText}>-</Text>
               </TouchableOpacity>
               <Text style={styles.qtyText}>{count}</Text>
-              <TouchableOpacity onPress={() => inc(item.id)} style={styles.stepBtn}>
+              <TouchableOpacity onPress={() => inc(item)} style={styles.stepBtn}>
                 <Text style={styles.stepText}>+</Text>
               </TouchableOpacity>
             </View>
@@ -105,16 +116,15 @@ export default function CatalogScreen() {
   };
 
   const onBuy = () => {
-    // monta o "mapa" {id: {name, price, qty}} apenas com itens > 0
     const map: Record<string, { name: string; price: number; qty: number }> = {};
-    for (const p of PRODUCTS) {
+    for (const p of products) {
       const q = qty[p.id] || 0;
-      if (q > 0) {
-        map[p.id] = { name: p.name, price: p.price, qty: q };
-      }
+      if (q > 0) map[p.id] = { name: p.name, price: p.price, qty: q };
     }
-
-    // preenche o carrinho global e navega para o checkout
+    if (Object.keys(map).length === 0) {
+      Alert.alert("Carrinho vazio", "Selecione ao menos 1 item.");
+      return;
+    }
     setFromMap(map);
     router.push("/(main)/checkout");
   };
@@ -122,10 +132,8 @@ export default function CatalogScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
-        {/* Header simples */}
         <Text style={styles.header}>Catálogo</Text>
 
-        {/* Search bar */}
         <View style={styles.searchWrap}>
           <TextInput
             placeholder="Buscar produto..."
@@ -136,7 +144,6 @@ export default function CatalogScreen() {
           />
         </View>
 
-        {/* Lista */}
         <FlatList
           data={filtered}
           keyExtractor={(item) => item.id}
@@ -145,7 +152,6 @@ export default function CatalogScreen() {
           showsVerticalScrollIndicator={false}
         />
 
-        {/* Rodapé com total e botão */}
         <View style={styles.footer}>
           <View style={styles.totalBox}>
             <Text style={styles.totalLabel}>Total</Text>
@@ -219,17 +225,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     color: colors.text,
-    marginBottom: 8,
+    marginBottom: 4,
   },
   rowBetween: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  price: {
-    color: colors.text,
-    fontWeight: "600",
-  },
+  price: { color: colors.text, fontWeight: "700" },
+  stockInfo: { color: colors.muted, marginLeft: 6 },
   stepper: {
     flexDirection: "row",
     alignItems: "center",
@@ -246,11 +250,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  stepText: {
-    fontSize: 18,
-    color: colors.text,
-    fontWeight: "700",
-  },
+  stepText: { fontSize: 18, color: colors.text, fontWeight: "700" },
   qtyText: {
     minWidth: 18,
     textAlign: "center",
