@@ -25,21 +25,22 @@ const colors = {
 };
 
 function stockColor(stock: number) {
-  if (stock < 5) return "#C13A3A";   
-  if (stock < 10) return "#C9A21A"; 
-  return "#333333";                  
+  if (stock < 5) return "#C13A3A";   // vermelho
+  if (stock < 10) return "#C9A21A";  // amarelo
+  return "#333333";                  // normal
 }
 
 export default function CatalogScreen() {
   const [query, setQuery] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
-  const [qty, setQty] = useState<Record<string, number>>({}); 
+  const [qty, setQty] = useState<Record<string, number>>({});
   const setFromMap = useCartStore((s) => s.setFromMap);
 
   const load = useCallback(async () => {
     try {
       const list = await getAllProducts();
       setProducts(list);
+      // garante que a seleção não ultrapasse o estoque atual
       setQty((prev) => {
         const next = { ...prev };
         for (const p of list) {
@@ -53,8 +54,17 @@ export default function CatalogScreen() {
     }
   }, []);
 
+  // carrega uma vez ao montar
   useEffect(() => { load(); }, [load]);
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  // 🔁 sempre que a tela voltar ao foco (ex.: após finalizar compra),
+  // zeramos as quantidades selecionadas e recarregamos o estoque
+  useFocusEffect(
+    useCallback(() => {
+      setQty({});
+      load();
+    }, [load])
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
