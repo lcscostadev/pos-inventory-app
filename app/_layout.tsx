@@ -7,16 +7,15 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { migrate } from "../db";
 
 const colors = {
-  background: "#F5E6CC", 
-  primary: "#C49A6C",    
-  text: "#333333",       
+  background: "#F5E6CC",
+  primary: "#C49A6C",
+  text: "#333333",
 };
 
 export default function RootLayout() {
   useEffect(() => {
     migrate().catch((e) => console.warn("Erro ao migrar DB:", e));
   }, []);
-
 
   const [loaded] = useFonts({
     // Inter: require("../assets/fonts/Inter-Regular.ttf"),
@@ -36,13 +35,11 @@ export default function RootLayout() {
       <StatusBar style="dark" backgroundColor={colors.background} />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: colors.primary },
-          headerTintColor: "#fff",
-          headerTitleStyle: { fontFamily: "Inter-Bold" },
           contentStyle: { backgroundColor: colors.background },
         }}
       >
-      
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="(main)" options={{ headerShown: false }} />
       </Stack>
     </SafeAreaProvider>
   );

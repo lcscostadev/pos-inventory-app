@@ -24,11 +24,16 @@ const colors = {
   border: "#E0C9A6",
 };
 
+function stockColor(stock: number) {
+  if (stock < 5) return "#C13A3A";   
+  if (stock < 10) return "#C9A21A"; 
+  return "#333333";                  
+}
+
 export default function CatalogScreen() {
   const [query, setQuery] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const [qty, setQty] = useState<Record<string, number>>({}); 
-
   const setFromMap = useCartStore((s) => s.setFromMap);
 
   const load = useCallback(async () => {
@@ -48,10 +53,7 @@ export default function CatalogScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
+  useEffect(() => { load(); }, [load]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const filtered = useMemo(() => {
@@ -87,16 +89,27 @@ export default function CatalogScreen() {
   const renderItem = ({ item }: { item: Product }) => {
     const count = qty[item.id] ?? 0;
     const remaining = item.stock - count;
+
     return (
       <View style={styles.card}>
-        <Image source={require("../../assets/images/biscoito.png")} style={styles.image} resizeMode="cover" />
+        <Image
+          source={require("../../assets/images/biscoito.png")}
+          style={styles.image}
+          resizeMode="cover"
+        />
         <View style={styles.cardContent}>
           <Text style={styles.name}>{item.name}</Text>
 
-          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
-            <Text style={styles.price}>R$ {item.price}</Text>
-            <Text style={styles.stockInfo}> • Em estoque: {item.stock}</Text>
-            {count > 0 && <Text style={styles.stockInfo}> • Restante: {remaining}</Text>}
+          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}>
+            <Text style={[styles.price, { marginRight: 6 }]}>R$ {item.price}</Text>
+            <Text style={[styles.stockInfo, { color: stockColor(item.stock) }]}>
+              • Em estoque: {item.stock}
+            </Text>
+            {count > 0 && (
+              <Text style={[styles.stockInfo, { color: stockColor(remaining) }]}>
+                • Restante: {remaining}
+              </Text>
+            )}
           </View>
 
           <View style={styles.rowBetween}>
@@ -132,7 +145,7 @@ export default function CatalogScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
-        <Text style={styles.header}>Catálogo</Text>
+        {/* <Text style={styles.header}>Catálogo</Text> */}
 
         <View style={styles.searchWrap}>
           <TextInput
@@ -233,7 +246,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   price: { color: colors.text, fontWeight: "700" },
-  stockInfo: { color: colors.muted, marginLeft: 6 },
+  stockInfo: { color: colors.muted, marginLeft: 6, fontSize: 12, fontWeight: "600" },
   stepper: {
     flexDirection: "row",
     alignItems: "center",

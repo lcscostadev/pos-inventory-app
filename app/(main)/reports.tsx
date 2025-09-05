@@ -18,26 +18,23 @@ const mockTransactions = [
 ];
 
 export default function Reports() {
-  // Valor de estoque = soma (stock * cost)
   const inventoryValue = useMemo(
     () => mockProducts.reduce((acc, p) => acc + p.stock * p.cost, 0),
     []
   );
 
-  // Receita (exemplo: soma total das transações mock)
   const revenue = useMemo(
     () => mockTransactions.reduce((acc, t) => acc + t.total, 0),
     []
   );
 
-  // Custo estimado das peças vendidas (ex.: 1 un = 1 cost do produto com price 10)
-  // Como mockTransactions não tem mix, vamos assumir margem média de 55–60% no MVP:
-  const estimatedCost = revenue * 0.45; // ajuste depois com dados reais
+
+  const estimatedCost = revenue * 0.45; 
   const profit = revenue - estimatedCost;
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.title}>Relatórios</Text>
+      {/* <Text style={styles.title}>Relatórios</Text> */}
 
       {/* Cards */}
       <View style={styles.cards}>

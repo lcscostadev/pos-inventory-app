@@ -12,8 +12,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { finalizeSale } from "../../db";
+import { finalizeSale, getAllProducts } from "../../db";
 import { useCartStore } from "../../store/useCartStore";
+import { useNotifications } from "../../store/useNotifications";
 import colors from "../../theme/colors";
 import { money } from "../../utils/currency";
 
@@ -23,6 +24,7 @@ export default function Checkout() {
   const { items, setQty, remove, clear, total } = useCartStore();
   const [zoom, setZoom] = useState(false);
 
+  const addNotif = useNotifications((s) => s.add);                
   const totalValue = useMemo(() => total(), [items]);
 
   const copyPixKey = async () => {
@@ -46,11 +48,26 @@ export default function Checkout() {
         unitPrice: i.price,
       }));
 
-      await finalizeSale(payload); 
-      clear();
+      await finalizeSale(payload);                                
 
+      // 🔔 Notificações
+      // 1) Venda
+      addNotif("sale", `Nova venda confirmada: R$ ${totalValue.toFixed(2)}`);
+
+      const all = await getAllProducts();
+      for (const it of items) {
+        const prod = all.find((p) => p.id === it.id);
+        if (!prod) continue;
+        if (prod.stock < 5) {
+          addNotif("stock", `Estoque crítico (${prod.name}): ${prod.stock} un.`);
+        } else if (prod.stock < 10) {
+          addNotif("stock", `Estoque baixo (${prod.name}): ${prod.stock} un.`);
+        }
+      }
+
+      clear();
       Alert.alert("Venda concluída", "Estoque atualizado e venda registrada.");
-      router.replace("/(main)"); 
+      router.replace("/(main)");
     } catch (e: any) {
       Alert.alert("Erro ao salvar", e?.message ?? "Tente novamente.");
     }
@@ -58,7 +75,7 @@ export default function Checkout() {
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.title}>Checkout</Text>
+      {/* <Text style={styles.title}>Checkout</Text> */}
 
       <FlatList
         data={items}
@@ -156,18 +173,35 @@ const styles = StyleSheet.create({
   price: { color: colors.muted },
 
   stepper: {
-    flexDirection: "row", alignItems: "center",
-    backgroundColor: "#F8F3EA", borderRadius: 999, borderWidth: 1, borderColor: colors.border,
-    paddingHorizontal: 8, height: 32, marginRight: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F8F3EA",
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 8,
+    height: 32,
+    marginRight: 8,
   },
   stepBtn: { width: 28, height: 28, alignItems: "center", justifyContent: "center" },
   stepText: { fontSize: 18, color: colors.text, fontWeight: "700" },
   qty: { minWidth: 18, textAlign: "center", fontWeight: "700", color: colors.text },
-  remove: { backgroundColor: "#d9534f", paddingHorizontal: 8, height: 28, borderRadius: 6, alignItems: "center", justifyContent: "center" },
+  remove: {
+    backgroundColor: "#d9534f",
+    paddingHorizontal: 8,
+    height: 28,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
   card: {
-    backgroundColor: "#fff", borderRadius: 12, borderWidth: 1, borderColor: colors.border,
-    padding: 12, marginTop: 6,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 12,
+    marginTop: 6,
   },
   cardTitle: { fontWeight: "800", color: colors.text, marginBottom: 8 },
   help: { color: colors.muted, marginBottom: 10 },
@@ -176,16 +210,35 @@ const styles = StyleSheet.create({
   qr: { width: 200, height: 200 },
   tapHint: { marginTop: 6, color: colors.muted, fontSize: 12 },
 
-  copyBtn: { backgroundColor: colors.primary, borderRadius: 8, alignItems: "center", padding: 10, marginTop: 10 },
+  copyBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    alignItems: "center",
+    padding: 10,
+    marginTop: 10,
+  },
   copyText: { color: "#fff", fontWeight: "800" },
 
   totalRow: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 12 },
   totalBox: {
-    flex: 1, backgroundColor: "#fff", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: colors.border,
+    flex: 1,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   totalLabel: { color: colors.muted, fontSize: 12, marginBottom: 2 },
   totalValue: { color: colors.text, fontWeight: "800", fontSize: 16 },
-  confirmBtn: { backgroundColor: colors.primary, paddingHorizontal: 22, height: 48, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  confirmBtn: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 22,
+    height: 48,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   confirmText: { color: "#fff", fontWeight: "800", letterSpacing: 0.5 },
 
   modalBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.8)", alignItems: "center", justifyContent: "center" },
