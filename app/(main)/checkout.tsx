@@ -50,8 +50,6 @@ export default function Checkout() {
 
       await finalizeSale(payload);                                
 
-      // 🔔 Notificações
-      // 1) Venda
       addNotif("sale", `Nova venda confirmada: R$ ${totalValue.toFixed(2)}`);
 
       const all = await getAllProducts();

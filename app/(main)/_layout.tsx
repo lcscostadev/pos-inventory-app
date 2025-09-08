@@ -76,6 +76,18 @@ export default function MainLayout() {
           }}
         />
       </Tabs>
+
+      <Tabs.Screen
+        name="ingredients"
+        options={{
+          title: "Ingredientes",
+          tabBarIcon: ({ color, size }) => (
+            // pode trocar o ícone se preferir
+            <Ionicons name="nutrition" color={color} size={size} />
+          ),
+        }}
+      />
+
     </>
   );
 }

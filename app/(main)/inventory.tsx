@@ -3,6 +3,8 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   FlatList,
+  Modal,
+  Pressable,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -10,7 +12,15 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { addProduct, getAllProducts, incrementProductStock, Product, setProductStock } from "../../db";
+import {
+  addProduct,
+  deleteProduct,
+  getAllProducts,
+  incrementProductStock,
+  Product,
+  setProductStock,
+  updateProduct,
+} from "../../db";
 
 const colors = {
   bg: "#F5E6CC",
@@ -39,6 +49,11 @@ export default function InventoryScreen() {
   const [cost, setCost] = useState("");
   const [stock, setStock] = useState("");
 
+  const [editOpen, setEditOpen] = useState(false);
+  const [edit, setEdit] = useState<{
+    id: string; name: string; price: string; cost: string; stock: string
+  } | null>(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -54,10 +69,26 @@ export default function InventoryScreen() {
   useEffect(() => { load(); }, [load]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const onInc = async (p: Product) => {
-    await incrementProductStock(p.id, +1);
-    await load();
+  const addNew = async () => {
+    try {
+      const nPrice = Number((price || "").replace(",", "."));
+      const nCost  = Number((cost  || "").replace(",", "."));
+      const nStock = Math.max(0, Math.floor(Number(stock) || 0));
+
+      if (!name.trim()) return Alert.alert("Validação", "Informe o nome.");
+      if (!(nPrice >= 0)) return Alert.alert("Validação", "Preço inválido.");
+      if (!(nCost  >= 0)) return Alert.alert("Validação", "Custo inválido.");
+
+      await addProduct({ name: name.trim(), price: nPrice, cost: nCost, stock: nStock });
+      setName(""); setPrice(""); setCost(""); setStock("");
+      await load();
+      Alert.alert("Produto", "Cadastrado com sucesso.");
+    } catch (e: any) {
+      Alert.alert("Erro", e?.message ?? "Não foi possível adicionar o produto.");
+    }
   };
+
+  const onInc = async (p: Product) => { await incrementProductStock(p.id, +1); await load(); };
   const onDec = async (p: Product) => {
     if (p.stock <= 0) return;
     await incrementProductStock(p.id, -1);
@@ -69,54 +100,101 @@ export default function InventoryScreen() {
     await load();
   };
 
-  const addNew = async () => {
+  const openEdit = (p: Product) => {
+    setEdit({
+      id: p.id,
+      name: p.name,
+      price: String(p.price).replace(".", ","),
+      cost: String(p.cost).replace(".", ","),
+      stock: String(p.stock),
+    });
+    setEditOpen(true);
+  };
+
+  const saveEdit = async () => {
+    if (!edit) return;
     try {
-      const nPrice = Number(price.replace(",", "."));
-      const nCost = Number(cost.replace(",", "."));
-      const nStock = Math.max(0, Math.floor(Number(stock) || 0));
-
-      if (!name.trim()) return Alert.alert("Validação", "Informe o nome.");
-      if (!(nPrice > 0)) return Alert.alert("Validação", "Preço inválido.");
-      if (!(nCost >= 0)) return Alert.alert("Validação", "Custo inválido.");
-
-      await addProduct({ name: name.trim(), price: nPrice, cost: nCost, stock: nStock });
-      setName(""); setPrice(""); setCost(""); setStock("");
+      await updateProduct({
+        id: edit.id,
+        name: edit.name,
+        price: Number(edit.price.replace(",", ".")),
+        cost: Number(edit.cost.replace(",", ".")),
+        stock: Math.max(0, Math.floor(Number(edit.stock) || 0)),
+      });
+      setEditOpen(false);
+      setEdit(null);
       await load();
-      Alert.alert("Produto", "Cadastrado com sucesso.");
+      Alert.alert("Produto", "Atualizado com sucesso.");
     } catch (e: any) {
-      Alert.alert("Erro", e?.message ?? "Não foi possível adicionar o produto.");
+      Alert.alert("Erro ao atualizar", e?.message ?? "Tente novamente.");
     }
+  };
+
+  const confirmDelete = (p: Product) => {
+    Alert.alert(
+      "Excluir produto",
+      `Tem certeza que deseja excluir "${p.name}"?`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Excluir",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteProduct(p.id);
+              await load();
+              Alert.alert("Produto", "Excluído com sucesso.");
+            } catch (e: any) {
+              Alert.alert("Não foi possível excluir", e?.message ?? "Tente novamente.");
+            }
+          },
+        },
+      ]
+    );
   };
 
   const renderItem = ({ item }: { item: Product }) => {
     return (
-      <View style={styles.card}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.name}>{item.name}</Text>
-          <Text style={styles.subtitle}>Preço: R$ {item.price.toFixed(2)} • Custo: R$ {item.cost.toFixed(2)}</Text>
-        </View>
-
-        <View style={styles.stockCol}>
-          <Text style={[styles.stockLabel, { color: stockColor(item.stock) }]}>
-            Estoque: {item.stock}
-          </Text>
-          <View style={styles.stepper}>
-            <TouchableOpacity onPress={() => onDec(item)} style={styles.stepBtn}>
-              <Text style={styles.stepText}>-</Text>
-            </TouchableOpacity>
-            <TextInput
-              defaultValue={String(item.stock)}
-              keyboardType="number-pad"
-              returnKeyType="done"
-              onEndEditing={(e) => onSetStock(item, e.nativeEvent.text)}
-              style={styles.stockInput}
-            />
-            <TouchableOpacity onPress={() => onInc(item)} style={styles.stepBtn}>
-              <Text style={styles.stepText}>+</Text>
-            </TouchableOpacity>
+      <Pressable onLongPress={() => openEdit(item)}>
+        <View style={styles.card}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.name}>{item.name}</Text>
+            <Text style={styles.subtitle}>
+              Preço: R$ {item.price.toFixed(2)} • Custo: R$ {item.cost.toFixed(2)}
+            </Text>
           </View>
+
+          <View style={styles.stockCol}>
+            <Text style={[styles.stockLabel, { color: stockColor(item.stock) }]}>
+              Estoque: {item.stock}
+            </Text>
+            <View style={styles.stepper}>
+              <TouchableOpacity onPress={() => onDec(item)} style={styles.stepBtn}>
+                <Text style={styles.stepText}>-</Text>
+              </TouchableOpacity>
+              <TextInput
+                defaultValue={String(item.stock)}
+                keyboardType="number-pad"
+                returnKeyType="done"
+                onEndEditing={(e) => onSetStock(item, e.nativeEvent.text)}
+                style={styles.stockInput}
+              />
+              <TouchableOpacity onPress={() => onInc(item)} style={styles.stepBtn}>
+                <Text style={styles.stepText}>+</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Lixeira */}
+          <TouchableOpacity
+            onPress={() => confirmDelete(item)}
+            style={styles.trashBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.trashText}>🗑️</Text>
+          </TouchableOpacity>
         </View>
-      </View>
+      </Pressable>
     );
   };
 
@@ -182,6 +260,67 @@ export default function InventoryScreen() {
           showsVerticalScrollIndicator={false}
         />
       </View>
+
+      <Modal
+        visible={editOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditOpen(false)}
+      >
+        <Pressable style={styles.backdrop} onPress={() => setEditOpen(false)}>
+          <Pressable style={styles.editCard} onPress={() => {}}>
+            <Text style={styles.editTitle}>Editar produto</Text>
+            <TextInput
+              placeholder="Nome"
+              value={edit?.name ?? ""}
+              onChangeText={(t) => setEdit((s) => (s ? { ...s, name: t } : s))}
+              style={styles.input}
+              placeholderTextColor={colors.muted}
+            />
+            <View style={styles.row}>
+              <TextInput
+                placeholder="Preço"
+                value={edit?.price ?? ""}
+                onChangeText={(t) => setEdit((s) => (s ? { ...s, price: t } : s))}
+                keyboardType="decimal-pad"
+                style={[styles.input, { flex: 1 }]}
+                placeholderTextColor={colors.muted}
+              />
+              <TextInput
+                placeholder="Custo"
+                value={edit?.cost ?? ""}
+                onChangeText={(t) => setEdit((s) => (s ? { ...s, cost: t } : s))}
+                keyboardType="decimal-pad"
+                style={[styles.input, { flex: 1 }]}
+                placeholderTextColor={colors.muted}
+              />
+            </View>
+            <TextInput
+              placeholder="Estoque"
+              value={edit?.stock ?? ""}
+              onChangeText={(t) => setEdit((s) => (s ? { ...s, stock: t } : s))}
+              keyboardType="number-pad"
+              style={styles.input}
+              placeholderTextColor={colors.muted}
+            />
+
+            <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 10, marginTop: 8 }}>
+              <TouchableOpacity
+                onPress={() => setEditOpen(false)}
+                style={[styles.modalBtn, { backgroundColor: "#ddd" }]}
+              >
+                <Text style={[styles.modalBtnText, { color: "#333" }]}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={saveEdit}
+                style={[styles.modalBtn, { backgroundColor: colors.primary }]}
+              >
+                <Text style={styles.modalBtnText}>Salvar</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -238,7 +377,7 @@ const styles = StyleSheet.create({
   },
   name: { fontSize: 16, fontWeight: "700", color: colors.text },
   subtitle: { color: colors.muted },
-  stockCol: { alignItems: "flex-end" },
+  stockCol: { alignItems: "flex-end", marginRight: 8 },
   stockLabel: { fontWeight: "800", marginBottom: 6 },
   stepper: {
     flexDirection: "row",
@@ -263,5 +402,32 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     color: colors.text,
     fontWeight: "700",
+  },
+  trashBtn: { marginLeft: 6, padding: 6 },
+  trashText: { fontSize: 18 },
+
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.25)", justifyContent: "center", alignItems: "center" },
+  editCard: {
+    width: "90%",
+    maxWidth: 420,
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+  },
+  editTitle: { fontWeight: "800", color: colors.text, marginBottom: 8, fontSize: 16 },
+
+  modalBtn: {
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 96,
+  },
+  modalBtnText: {
+    color: "#fff",
+    fontWeight: "800",
   },
 });

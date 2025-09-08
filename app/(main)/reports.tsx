@@ -1,65 +1,88 @@
-// app/(main)/reports.tsx
-import React, { useMemo } from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
+import {
+  getIngredientSpendTotal,
+  getIngredientsInventoryValue,
+  getProductsInventoryValue,
+  getRecentSales,
+  getRevenueTotal,
+  type SaleRow,
+} from "../../db";
 import colors from "../../theme/colors";
 import { money } from "../../utils/currency";
 
-// MOCK: depois ler de SQLite (sales / items / products)
-const mockProducts = [
-  { id: "1", name: "Tradicional", price: 10, cost: 4, stock: 12 },
-  { id: "2", name: "Goiabada",   price: 10, cost: 4.5, stock: 8 },
-  { id: "3", name: "Chocolate",  price: 10, cost: 5, stock: 15 },
-];
-
-const mockTransactions = [
-  { id: "t1", date: "2025-08-28 10:12", items: 3, total: 30 },
-  { id: "t2", date: "2025-08-28 14:05", items: 2, total: 20 },
-  { id: "t3", date: "2025-08-29 09:20", items: 5, total: 50 },
-];
-
 export default function Reports() {
-  const inventoryValue = useMemo(
-    () => mockProducts.reduce((acc, p) => acc + p.stock * p.cost, 0),
-    []
+  const [loading, setLoading] = useState(false);
+  const [revenue, setRevenue] = useState(0);
+  const [ingSpend, setIngSpend] = useState(0);
+  const [invProducts, setInvProducts] = useState(0);
+  const [invIngredients, setInvIngredients] = useState(0);
+  const [tx, setTx] = useState<SaleRow[]>([]);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const [rev, isp, invP, invI, sales] = await Promise.all([
+        getRevenueTotal(),
+        getIngredientSpendTotal(),
+        getProductsInventoryValue(),
+        getIngredientsInventoryValue(),
+        getRecentSales(30),
+      ]);
+      setRevenue(rev);
+      setIngSpend(isp);
+      setInvProducts(invP);
+      setInvIngredients(invI);
+      setTx(sales);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const profit = useMemo(() => revenue - ingSpend, [revenue, ingSpend]);
+  const inventoryTotal = useMemo(
+    () => invProducts + invIngredients,
+    [invProducts, invIngredients]
   );
-
-  const revenue = useMemo(
-    () => mockTransactions.reduce((acc, t) => acc + t.total, 0),
-    []
-  );
-
-
-  const estimatedCost = revenue * 0.45; 
-  const profit = revenue - estimatedCost;
 
   return (
     <View style={styles.wrap}>
-      {/* <Text style={styles.title}>Relatórios</Text> */}
-
-      {/* Cards */}
       <View style={styles.cards}>
         <View style={styles.card}>
-          <Text style={styles.cardLabel}>Lucro (estimado)</Text>
+          <Text style={styles.cardLabel}>Lucro (caixa)</Text>
           <Text style={styles.cardValue}>{money(profit)}</Text>
+          <Text style={styles.smallMuted}>
+            Receita {money(revenue)} − Ingred. {money(ingSpend)}
+          </Text>
         </View>
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Valor em estoque</Text>
-          <Text style={styles.cardValue}>{money(inventoryValue)}</Text>
+          <Text style={styles.cardValue}>{money(inventoryTotal)}</Text>
+          <Text style={styles.smallMuted}>
+            Produtos {money(invProducts)} • Ingred. {money(invIngredients)}
+          </Text>
         </View>
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Transações</Text>
-          <Text style={styles.cardValue}>{mockTransactions.length}</Text>
+          <Text style={styles.cardValue}>{tx.length}</Text>
+          <Text style={styles.smallMuted}>últimas {tx.length}</Text>
         </View>
       </View>
 
       <Text style={[styles.subtitle, { marginTop: 12 }]}>Transações recentes</Text>
       <FlatList
-        data={mockTransactions}
+        data={tx}
         keyExtractor={(t) => t.id}
         renderItem={({ item }) => (
           <View style={styles.txRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.txDate}>{item.date}</Text>
+              <Text style={styles.txDate}>
+                {new Date(item.created_at).toLocaleString()}
+              </Text>
               <Text style={styles.txItems}>{item.items} itens</Text>
             </View>
             <Text style={styles.txTotal}>{money(item.total)}</Text>
@@ -67,6 +90,7 @@ export default function Reports() {
         )}
         ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
         contentContainerStyle={{ paddingBottom: 20 }}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
       />
     </View>
   );
@@ -74,18 +98,27 @@ export default function Reports() {
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: colors.bg, padding: 16 },
-  title: { fontSize: 20, fontWeight: "800", color: colors.text, marginBottom: 10 },
   cards: { flexDirection: "row", gap: 10 },
   card: {
-    flex: 1, backgroundColor: "#fff", borderRadius: 12, borderWidth: 1, borderColor: colors.border,
+    flex: 1,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
     padding: 12,
   },
   cardLabel: { color: colors.muted, marginBottom: 4 },
   cardValue: { fontWeight: "800", color: colors.text, fontSize: 16 },
+  smallMuted: { color: colors.muted, fontSize: 12, marginTop: 4 },
   subtitle: { fontWeight: "800", color: colors.text, marginBottom: 8 },
   txRow: {
-    flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 12,
-    borderWidth: 1, borderColor: colors.border, padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 12,
   },
   txDate: { color: colors.text, fontWeight: "700" },
   txItems: { color: colors.muted },
