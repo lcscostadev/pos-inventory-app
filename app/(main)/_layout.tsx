@@ -1,17 +1,20 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as NavigationBar from "expo-navigation-bar";
 import { Tabs } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useState } from "react";
+import { Platform } from "react-native";
 
 import { onAuthStateChanged } from "firebase/auth";
 import HeaderBarRight from "../../components/HeaderBarRight";
 import { auth } from "../../services/firebase";
 import { useNotifications } from "../../store/useNotifications";
 
-
 export default function MainLayout() {
-  const markAllRead = useNotifications((s) => s.markAllRead);
+  const markAllRead = useNotifications((s) => s.markAllRead); // se quiser usar no HeaderBarRight
   const [displayName, setDisplayName] = useState<string>("Usuária");
 
+  // Nome exibido no header
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       if (u?.displayName) setDisplayName(u.displayName);
@@ -21,9 +24,25 @@ export default function MainLayout() {
     return () => unsub();
   }, []);
 
-  return (
+  useEffect(() => {
+    const run = async () => {
+      if (Platform.OS === "android") {
+        try {
+          await NavigationBar.setVisibilityAsync("hidden");
+          await NavigationBar.setBehaviorAsync("overlay-swipe"); // aparece no gesto e some
+          await NavigationBar.setButtonStyleAsync("light");
+        } catch (e) {
+          console.warn("NavigationBar:", e);
+        }
+      }
+    };
+    run();
+  }, []);
 
+  return (
     <>
+      <StatusBar hidden />
+
       <Tabs
         screenOptions={{
           headerStyle: { backgroundColor: "#F5E6CC" },
@@ -33,6 +52,7 @@ export default function MainLayout() {
             <HeaderBarRight
               name={displayName}
               role="Administradora"
+              // onBellPress={markAllRead} // opcional
             />
           ),
           tabBarActiveTintColor: "#C49A6C",
@@ -75,19 +95,16 @@ export default function MainLayout() {
             ),
           }}
         />
+        <Tabs.Screen
+          name="ingredients"
+          options={{
+            title: "Ingredientes",
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="nutrition" color={color} size={size} />
+            ),
+          }}
+        />
       </Tabs>
-
-      <Tabs.Screen
-        name="ingredients"
-        options={{
-          title: "Ingredientes",
-          tabBarIcon: ({ color, size }) => (
-            // pode trocar o ícone se preferir
-            <Ionicons name="nutrition" color={color} size={size} />
-          ),
-        }}
-      />
-
     </>
   );
 }

@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import {
   addProduct,
+  clearAllProductStock,
   deleteProduct,
   getAllProducts,
   incrementProductStock,
@@ -30,8 +31,8 @@ const colors = {
   text: "#333333",
   muted: "#7A7A7A",
   border: "#E0C9A6",
-  warn: "#C9A21A",   
-  danger: "#C13A3A", 
+  warn: "#C9A21A",   // <10
+  danger: "#C13A3A", // <5
 };
 
 function stockColor(stock: number) {
@@ -153,6 +154,25 @@ export default function InventoryScreen() {
     );
   };
 
+  const zeroAll = () => {
+    Alert.alert(
+      "Zerar estoque",
+      "Isto definirá o estoque de TODOS os produtos para 0. Deseja continuar?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Zerar",
+          style: "destructive",
+          onPress: async () => {
+            await clearAllProductStock();
+            await load();
+            Alert.alert("Estoque", "Todos os estoques foram zerados.");
+          },
+        },
+      ]
+    );
+  };
+
   const renderItem = ({ item }: { item: Product }) => {
     return (
       <Pressable onLongPress={() => openEdit(item)}>
@@ -185,7 +205,6 @@ export default function InventoryScreen() {
             </View>
           </View>
 
-          {/* Lixeira */}
           <TouchableOpacity
             onPress={() => confirmDelete(item)}
             style={styles.trashBtn}
@@ -201,7 +220,12 @@ export default function InventoryScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
-        {/* <Text style={styles.header}>Estoque</Text> */}
+        <View style={styles.topRow}>
+          <Text style={styles.header}>Estoque</Text>
+          <TouchableOpacity style={styles.warnBtn} onPress={zeroAll}>
+            <Text style={styles.warnText}>Zerar estoque</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.form}>
           <Text style={styles.formTitle}>Novo produto</Text>
@@ -330,7 +354,9 @@ const CARD_RADIUS = 14;
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   container: { flex: 1, backgroundColor: colors.bg, padding: 16 },
-  header: { fontSize: 20, fontWeight: "800", color: colors.text, marginBottom: 12 },
+
+  topRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
+  header: { fontSize: 20, fontWeight: "800", color: colors.text },
 
   form: {
     backgroundColor: colors.card,
@@ -430,4 +456,12 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "800",
   },
+
+  warnBtn: {
+    backgroundColor: "#E0A800",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  warnText: { color: "#fff", fontWeight: "800" },
 });

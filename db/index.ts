@@ -17,7 +17,7 @@ export type CartItemInput = {
 export type Ingredient = {
   id: string;
   name: string;
-  unit: string;     
+  unit: string;       
   unit_price: number; 
   qty: number;       
 };
@@ -150,10 +150,6 @@ export async function deleteProduct(id: string): Promise<void> {
   await db.runAsync("DELETE FROM products WHERE id = ?;", [id]);
 }
 
-export async function setIngredientUnitPrice(id: string, unit_price: number): Promise<void> {
-  await db.runAsync("UPDATE ingredients SET unit_cost = ? WHERE id = ?;", [Number(unit_price), id]);
-}
-
 export async function setProductStock(id: string, stock: number): Promise<void> {
   const safe = Math.max(0, Math.floor(Number(stock) || 0));
   await db.runAsync("UPDATE products SET stock = ? WHERE id = ?;", [safe, id]);
@@ -165,6 +161,11 @@ export async function incrementProductStock(id: string, delta: number): Promise<
     [delta, id]
   );
 }
+
+export async function clearAllProductStock(): Promise<void> {
+  await db.runAsync("UPDATE products SET stock = 0;");
+}
+
 
 export async function finalizeSale(
   items: CartItemInput[]
@@ -245,6 +246,14 @@ export async function getRecentSales(limit = 20): Promise<SaleRow[]> {
   );
 }
 
+export async function clearAllSales(): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    await db.runAsync("DELETE FROM sale_items;");
+    await db.runAsync("DELETE FROM sales;");
+  });
+}
+
+
 export async function listIngredients(): Promise<Ingredient[]> {
   const rows = await db.getAllAsync<any>(`
     SELECT id, name, unit, unit_cost, stock_qty FROM ingredients ORDER BY name;
@@ -305,7 +314,7 @@ export async function addIngredientPurchase(params: {
   ingredient_id: string;
   qty: number;
   unit_price: number;
-  purchased_at?: string; // ISO
+  purchased_at?: string; 
 }): Promise<string> {
   const id = nowId("ip_");
   const date = params.purchased_at ?? new Date().toISOString();

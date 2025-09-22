@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import {
+  clearAllSales,
   getIngredientSpendTotal,
   getIngredientsInventoryValue,
   getProductsInventoryValue,
@@ -39,9 +40,7 @@ export default function Reports() {
     }
   };
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
   const profit = useMemo(() => revenue - ingSpend, [revenue, ingSpend]);
   const inventoryTotal = useMemo(
@@ -49,8 +48,34 @@ export default function Reports() {
     [invProducts, invIngredients]
   );
 
+  const confirmClear = () => {
+    Alert.alert(
+      "Limpar transações",
+      "Isso apagará todas as vendas e itens de venda. O estoque NÃO será alterado. Deseja continuar?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Apagar",
+          style: "destructive",
+          onPress: async () => {
+            await clearAllSales();
+            await load();
+            Alert.alert("Transações", "Todas as transações foram removidas.");
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={styles.wrap}>
+      <View style={styles.topRow}>
+        <Text style={styles.title}>Relatórios</Text>
+        <TouchableOpacity style={styles.dangerBtn} onPress={confirmClear}>
+          <Text style={styles.dangerText}>Limpar transações</Text>
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.cards}>
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Lucro (caixa)</Text>
@@ -98,6 +123,9 @@ export default function Reports() {
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: colors.bg, padding: 16 },
+  topRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
+  title: { fontSize: 20, fontWeight: "800", color: colors.text },
+
   cards: { flexDirection: "row", gap: 10 },
   card: {
     flex: 1,
@@ -123,4 +151,12 @@ const styles = StyleSheet.create({
   txDate: { color: colors.text, fontWeight: "700" },
   txItems: { color: colors.muted },
   txTotal: { color: colors.text, fontWeight: "800" },
+
+  dangerBtn: {
+    backgroundColor: "#D9534F",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  dangerText: { color: "#fff", fontWeight: "800" },
 });

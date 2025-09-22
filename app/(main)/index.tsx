@@ -40,7 +40,6 @@ export default function CatalogScreen() {
     try {
       const list = await getAllProducts();
       setProducts(list);
-      // garante que a seleção não ultrapasse o estoque atual
       setQty((prev) => {
         const next = { ...prev };
         for (const p of list) {
@@ -54,11 +53,8 @@ export default function CatalogScreen() {
     }
   }, []);
 
-  // carrega uma vez ao montar
   useEffect(() => { load(); }, [load]);
 
-  // 🔁 sempre que a tela voltar ao foco (ex.: após finalizar compra),
-  // zeramos as quantidades selecionadas e recarregamos o estoque
   useFocusEffect(
     useCallback(() => {
       setQty({});
