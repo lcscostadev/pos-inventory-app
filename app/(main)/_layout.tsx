@@ -19,7 +19,7 @@ export default function MainLayout() {
     const unsub = onAuthStateChanged(auth, (u) => {
       if (u?.displayName) setDisplayName(u.displayName);
       else if (u?.email) setDisplayName(u.email.split("@")[0]);
-      else setDisplayName("Administradora");
+      else setDisplayName("Célia Cerutti");
     });
     return () => unsub();
   }, []);
@@ -98,9 +98,9 @@ export default function MainLayout() {
         <Tabs.Screen
           name="ingredients"
           options={{
-            title: "Ingredientes",
+            title: "Materiais",
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name="nutrition" color={color} size={size} />
+              <Ionicons name="construct" color={color} size={size} />
             ),
           }}
         />

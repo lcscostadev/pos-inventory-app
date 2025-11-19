@@ -6,6 +6,7 @@ export type Product = {
   price: number;
   cost: number;
   stock: number;
+  image: string;
 };
 
 export type CartItemInput = {

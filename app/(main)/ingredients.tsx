@@ -46,7 +46,7 @@ export default function IngredientsScreen() {
   const [loading, setLoading] = useState(false);
 
   const [name, setName] = useState("");
-  const [unit, setUnit] = useState("kg");
+  const [unit, setUnit] = useState("g");
   const [unitPrice, setUnitPrice] = useState("");
   const [qty, setQty] = useState("");
 
@@ -101,7 +101,7 @@ export default function IngredientsScreen() {
       });
 
       setName("");
-      setUnit("kg");
+      setUnit("g");
       setUnitPrice("");
       setQty("");
       await load();

@@ -7,14 +7,14 @@ export default function Splash() {
   useEffect(() => {
     const t = setTimeout(() => {
       router.replace("/(auth)/login");
-    }, 2000); // ~2s
+    }, 2000); 
     return () => clearTimeout(t);
   }, []);
 
   return (
     <View style={styles.container}>
       <Image source={require("../../assets/images/biscoito.png")} style={styles.img} />
-      <Text style={styles.brand}>Delícias da dedê</Text>
+      <Text style={styles.brand}>Cecerutti Atelie</Text>
     </View>
   );
 }

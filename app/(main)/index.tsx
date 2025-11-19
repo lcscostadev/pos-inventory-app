@@ -92,14 +92,14 @@ export default function CatalogScreen() {
       return { ...s, [id]: next };
     });
 
-  const renderItem = ({ item }: { item: Product }) => {
+  const renderItem = ({ item }: { item: Product }) => { 
     const count = qty[item.id] ?? 0;
     const remaining = item.stock - count;
 
     return (
       <View style={styles.card}>
         <Image
-          source={require("../../assets/images/biscoito.png")}
+          source={require("../../assets/images/bolsa-de-mao.png")}
           style={styles.image}
           resizeMode="cover"
         />
