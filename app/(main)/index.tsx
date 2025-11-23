@@ -35,6 +35,12 @@ export default function CatalogScreen() {
   const [products, setProducts] = useState<Product[]>([]);
   const [qty, setQty] = useState<Record<string, number>>({});
   const setFromMap = useCartStore((s) => s.setFromMap);
+  const productImages: Record<string, any> = {
+    img1: require("../../assets/images/bikini.png"),
+    img2: require("../../assets/images/bolsa-de-mao.png"),
+    img3: require("../../assets/images/tapete.png"),
+    img4: require("../../assets/images/vestido.png"),
+  };
 
   const load = useCallback(async () => {
     try {
@@ -92,14 +98,14 @@ export default function CatalogScreen() {
       return { ...s, [id]: next };
     });
 
-  const renderItem = ({ item }: { item: Product }) => { 
+  const renderItem = ({ item }: { item: Product }) => {
     const count = qty[item.id] ?? 0;
     const remaining = item.stock - count;
 
     return (
       <View style={styles.card}>
         <Image
-          source={require("../../assets/images/bolsa-de-mao.png")}
+          source={productImages[item.image] ?? productImages["img1"]}
           style={styles.image}
           resizeMode="cover"
         />

@@ -6,7 +6,7 @@ export type Product = {
   price: number;
   cost: number;
   stock: number;
-  image: string;
+  image: string; 
 };
 
 export type CartItemInput = {
@@ -18,9 +18,9 @@ export type CartItemInput = {
 export type Ingredient = {
   id: string;
   name: string;
-  unit: string;       
-  unit_price: number; 
-  qty: number;       
+  unit: string;
+  unit_price: number;
+  qty: number;
 };
 
 export type SaleRow = {
@@ -36,6 +36,7 @@ function nowId(prefix = "") {
   return `${prefix}${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
 }
 
+
 export async function migrate() {
   await db.withTransactionAsync(async () => {
     await db.execAsync("PRAGMA foreign_keys = ON;");
@@ -46,9 +47,14 @@ export async function migrate() {
         name TEXT NOT NULL,
         price REAL NOT NULL,
         cost REAL NOT NULL,
-        stock INTEGER NOT NULL
+        stock INTEGER NOT NULL,
+        image TEXT
       );
     `);
+
+    await db.execAsync(`
+      ALTER TABLE products ADD COLUMN image TEXT;
+    `).catch(() => {});
 
     await db.execAsync(`
       CREATE TABLE IF NOT EXISTS sales (
@@ -89,19 +95,23 @@ export async function migrate() {
       );
     `);
 
+    // Seed dos produtos com imagens
     const row = await db.getFirstAsync<{ c: number }>(
       "SELECT COUNT(*) AS c FROM products;"
     );
+
     if ((row?.c ?? 0) === 0) {
       const seed: Product[] = [
-        { id: "p1", name: "Amanteigado Tradicional",  price: 10, cost: 4,   stock: 20 },
-        { id: "p2", name: "Amanteigado com Goiabada",  price: 10, cost: 4.5, stock: 15 },
-        { id: "p3", name: "Amanteigado com Chocolate", price: 10, cost: 5,   stock: 18 },
+        { id: "p1", name: "Amanteigado Tradicional",  price: 10, cost: 4,   stock: 20, image: "img1" },
+        { id: "p2", name: "Amanteigado com Goiabada",  price: 10, cost: 4.5, stock: 15, image: "img2" },
+        { id: "p3", name: "Amanteigado com Chocolate", price: 10, cost: 5,   stock: 18, image: "img3" },
       ];
+
       for (const p of seed) {
         await db.runAsync(
-          `INSERT INTO products (id, name, price, cost, stock) VALUES (?, ?, ?, ?, ?);`,
-          [p.id, p.name, p.price, p.cost, p.stock]
+          `INSERT INTO products (id, name, price, cost, stock, image)
+           VALUES (?, ?, ?, ?, ?, ?);`,
+          [p.id, p.name, p.price, p.cost, p.stock, p.image]
         );
       }
     }
@@ -111,32 +121,23 @@ export async function migrate() {
 
 export async function getAllProducts(): Promise<Product[]> {
   return await db.getAllAsync<Product>(
-    "SELECT * FROM products ORDER BY name;"
+    "SELECT id, name, price, cost, stock, COALESCE(image,'img1') AS image FROM products ORDER BY name;"
   );
 }
 
 export async function addProduct(p: Omit<Product, "id">): Promise<string> {
   const id = nowId("p_");
   await db.runAsync(
-    "INSERT INTO products (id, name, price, cost, stock) VALUES (?, ?, ?, ?, ?);",
-    [id, p.name.trim(), Number(p.price), Number(p.cost), Math.max(0, Math.floor(p.stock || 0))]
+    "INSERT INTO products (id, name, price, cost, stock, image) VALUES (?, ?, ?, ?, ?, ?);",
+    [id, p.name, p.price, p.cost, p.stock, p.image]
   );
   return id;
 }
 
-export async function updateProduct(p: {
-  id: string; name: string; price: number; cost: number; stock: number;
-}): Promise<void> {
-  const name = p.name.trim();
-  const price = Number(p.price);
-  const cost  = Number(p.cost);
-  const stock = Math.max(0, Math.floor(Number(p.stock) || 0));
-  if (!name) throw new Error("Nome obrigatório.");
-  if (!(price >= 0)) throw new Error("Preço inválido.");
-  if (!(cost  >= 0)) throw new Error("Custo inválido.");
+export async function updateProduct(p: Product): Promise<void> {
   await db.runAsync(
-    "UPDATE products SET name = ?, price = ?, cost = ?, stock = ? WHERE id = ?;",
-    [name, price, cost, stock, p.id]
+    "UPDATE products SET name = ?, price = ?, cost = ?, stock = ?, image = ? WHERE id = ?;",
+    [p.name, p.price, p.cost, p.stock, p.image, p.id]
   );
 }
 
@@ -152,8 +153,10 @@ export async function deleteProduct(id: string): Promise<void> {
 }
 
 export async function setProductStock(id: string, stock: number): Promise<void> {
-  const safe = Math.max(0, Math.floor(Number(stock) || 0));
-  await db.runAsync("UPDATE products SET stock = ? WHERE id = ?;", [safe, id]);
+  await db.runAsync("UPDATE products SET stock = ? WHERE id = ?;", [
+    Math.max(0, Math.floor(stock)),
+    id,
+  ]);
 }
 
 export async function incrementProductStock(id: string, delta: number): Promise<void> {
@@ -183,8 +186,8 @@ export async function finalizeSale(
         "SELECT stock FROM products WHERE id = ?;",
         [it.productId]
       );
-      const stock = row?.stock ?? 0;
-      if (stock < it.qty) throw new Error("Estoque insuficiente para algum item.");
+      if ((row?.stock ?? 0) < it.qty)
+        throw new Error("Estoque insuficiente para algum item.");
     }
 
     await db.runAsync(
@@ -194,10 +197,12 @@ export async function finalizeSale(
 
     for (const it of items) {
       const itemId = nowId("si_");
+
       await db.runAsync(
         "INSERT INTO sale_items (id, sale_id, product_id, qty, unit_price) VALUES (?, ?, ?, ?, ?);",
         [itemId, saleId, it.productId, it.qty, it.unitPrice]
       );
+
       await db.runAsync(
         "UPDATE products SET stock = stock - ? WHERE id = ?;",
         [it.qty, it.productId]
@@ -269,7 +274,10 @@ export async function listIngredients(): Promise<Ingredient[]> {
 }
 
 export async function addIngredient(i: {
-  name: string; unit: string; unit_price: number; qty: number;
+  name: string;
+  unit: string;
+  unit_price: number;
+  qty: number;
 }): Promise<string> {
   const id = nowId("ing_");
   await db.runAsync(
@@ -280,7 +288,11 @@ export async function addIngredient(i: {
 }
 
 export async function updateIngredient(i: {
-  id: string; name: string; unit: string; unit_price: number; qty: number;
+  id: string;
+  name: string;
+  unit: string;
+  unit_price: number;
+  qty: number;
 }): Promise<void> {
   await db.runAsync(
     "UPDATE ingredients SET name = ?, unit = ?, unit_cost = ?, stock_qty = ? WHERE id = ?;",
@@ -307,27 +319,30 @@ export async function incrementIngredientQty(id: string, delta: number): Promise
 }
 
 export async function setIngredientQty(id: string, qty: number): Promise<void> {
-  const v = Math.max(0, Number(qty) || 0);
-  await db.runAsync("UPDATE ingredients SET stock_qty = ? WHERE id = ?;", [v, id]);
+  await db.runAsync(
+    "UPDATE ingredients SET stock_qty = ? WHERE id = ?;",
+    [Math.max(0, qty), id]
+  );
 }
 
 export async function addIngredientPurchase(params: {
   ingredient_id: string;
   qty: number;
   unit_price: number;
-  purchased_at?: string; 
+  purchased_at?: string;
 }): Promise<string> {
   const id = nowId("ip_");
-  const date = params.purchased_at ?? new Date().toISOString();
   const qty = Number(params.qty);
   const unit_cost = Number(params.unit_price);
   const total = qty * unit_cost;
+  const date = params.purchased_at ?? new Date().toISOString();
 
   await db.withTransactionAsync(async () => {
     await db.runAsync(
       "INSERT INTO ingredient_purchases (id, ingredient_id, qty, unit_cost, total, date) VALUES (?, ?, ?, ?, ?, ?);",
       [id, params.ingredient_id, qty, unit_cost, total, date]
     );
+
     await db.runAsync(
       "UPDATE ingredients SET stock_qty = stock_qty + ?, unit_cost = ? WHERE id = ?;",
       [qty, unit_cost, params.ingredient_id]
